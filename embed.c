@@ -26,7 +26,7 @@ int embed_file(FILE *out_file, const char *prefix, const char *in_path) {
     }
   }
 
-  FILE *in_file = fopen(in_path, "r");
+  FILE *in_file = fopen(in_path, "rb");
   if (in_file == NULL) {
     free(name_str);
     return 1;
@@ -34,18 +34,25 @@ int embed_file(FILE *out_file, const char *prefix, const char *in_path) {
 
   fprintf(out_file, "#ifdef EMBED_IMPL\n");
   fprintf(out_file, "const unsigned char _embed_%s_%s[] = {", prefix, name_str);
-  long embed_len = 0;
   while (1) {
     unsigned char b;
     int count = fread(&b, 1, 1, in_file);
-    if (count == 0)
-      break;
+    if (count == 0) {
+      if (feof(in_file)) {
+        break;
+      } else {
+        free(name_str);
+        fclose(in_file);
+        return 1;
+      }
+    }
+
     fprintf(out_file, "0x%02x,", b);
-    embed_len += 1;
   }
 
+  const unsigned long data_size = ftell(in_file);
   fprintf(out_file, "};\nconst unsigned long _embed_%s_%s_len = %lu;\n", prefix,
-          name_str, embed_len);
+          name_str, data_size);
 
   fprintf(out_file, "#else\n");
 
